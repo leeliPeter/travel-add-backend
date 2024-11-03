@@ -33,6 +33,25 @@ header > * {
   }
 }
 
+#verification {
+  background-image: url("/images/rock.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+#verification::before {
+  content: "";
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.9),
+    rgba(128, 128, 128, 0.5)
+  );
+  z-index: 0;
+}
+
 .hamburger {
   cursor: pointer;
   width: 24px;

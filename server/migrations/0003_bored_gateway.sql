@@ -1,0 +1,1 @@
+ALTER TABLE "verificationToken" DROP COLUMN IF EXISTS "email";

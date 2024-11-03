@@ -2,11 +2,15 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import Member from "@/components/home-page/member";
-import { useSession, signIn, signOut } from "next-auth/react";
+import Member from "@/components/login/member";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 export default function Nav() {
+  // const pathname = usePathname();
+  // if (pathname.includes("auth/verification")) return null;
+
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showMember, setShowMember] = useState<boolean>(false);
   const [memberMode, setMemberMode] = useState<"login" | "signup">("login");

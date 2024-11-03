@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaGoogle, FaGithub } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema } from "@/types/login-schema";
+import { registerSchema } from "@/types/register-schema";
+import { emailSignIn } from "@/server/actions/email-signIn";
+import { emailRegister } from "@/server/actions/email-register";
+import { useAction } from "next-safe-action/hooks";
+import FormError from "@/components/login/form-error";
+import FormSuccess from "@/components/login/form-success";
 import * as z from "zod";
 import {
   Form,
@@ -14,32 +21,9 @@ import {
   FormField,
   FormItem,
   FormMessage,
+  FormLabel,
 } from "@/components/ui/form";
 import { signIn } from "next-auth/react";
-
-const formSchema = z
-  .object({
-    email: z.string().email("Please enter a valid email"),
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-      .regex(/[0-9]/, "Password must contain at least one number"),
-    confirmPassword: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.confirmPassword !== undefined) {
-        return data.password === data.confirmPassword;
-      }
-      return true;
-    },
-    {
-      message: "Passwords do not match",
-      path: ["confirmPassword"],
-    }
-  );
 
 interface MemberProps {
   onClose: () => void;
@@ -52,26 +36,56 @@ export default function Member({
 }: MemberProps) {
   const [isLogin, setIsLogin] = useState(initialMode === "login");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<
+    z.infer<typeof loginSchema> | z.infer<typeof registerSchema>
+  >({
+    resolver: zodResolver(isLogin ? loginSchema : registerSchema),
     defaultValues: {
       email: "",
       password: "",
-      confirmPassword: "",
+      ...(isLogin ? {} : { name: "", confirmPassword: "" }),
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsLoading(true);
-    try {
-      console.log(values);
-      // Add your authentication logic here
-      onClose(); // Close the form after successful submission
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
+  const { execute } = useAction(emailSignIn, {
+    onSuccess: (data) => {
+      if (data.data?.success) {
+        setSuccess(data.data.success);
+      }
+      if (data.data?.error) {
+        setError(data.data.error);
+      }
+    },
+  });
+  const { execute: registerExecute } = useAction(emailRegister, {
+    onSuccess: (data) => {
+      if (data.data?.success) {
+        setSuccess(data.data.success);
+      }
+      if (data.data?.error) {
+        setError(data.data.error);
+      }
+    },
+  });
+  const onSubmit = async (
+    data: z.infer<typeof loginSchema> | z.infer<typeof registerSchema>
+  ) => {
+    if (isLogin) {
+      // Handle login
+      const loginData = data as z.infer<typeof loginSchema>;
+
+      // Login logic here
+      console.log("Login", loginData);
+      execute(loginData);
+    } else {
+      // Handle registration
+      const registerData = data as z.infer<typeof registerSchema>;
+      // Registration logic here
+      console.log("Register", registerData);
+      registerExecute(registerData);
     }
   };
 
@@ -112,65 +126,96 @@ export default function Member({
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-6 sm:space-y-7"
               >
-                <div className="space-y-4 sm:space-y-5">
+                {!isLogin && (
                   <FormField
                     control={form.control}
-                    name="email"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>Name</FormLabel>
                         <FormControl>
-                          <Input
-                            {...field}
-                            type="email"
-                            placeholder="Email"
-                            className="h-11 sm:h-12 transition-all duration-200 hover:border-primary focus:ring-2 focus:ring-primary/20"
-                          />
+                          <Input placeholder="Enter your name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder="Password"
-                            className="h-11 sm:h-12 transition-all duration-200 hover:border-primary focus:ring-2 focus:ring-primary/20"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {!isLogin && (
-                    <FormField
-                      control={form.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="password"
-                              placeholder="Confirm Password"
-                              className="h-11 sm:h-12 transition-all duration-200 hover:border-primary focus:ring-2 focus:ring-primary/20"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Enter your password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      {isLogin && (
+                        <div className="flex justify-end">
+                          <Button
+                            variant="link"
+                            className="px-0 text-sm font-normal h-auto text-primary hover:text-primary/80"
+                            type="button"
+                            onClick={() =>
+                              (window.location.href = "/auth/reset")
+                            }
+                          >
+                            Forgot password?
+                          </Button>
+                        </div>
+                      )}
+                    </FormItem>
+                  )}
+                />
+
+                {!isLogin && (
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="Confirm your password"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {/* reminder */}
+                {success && <FormSuccess message={success} />}
+                {error && <FormError message={error} />}
 
                 <Button
                   type="submit"
-                  className="w-full h-11 sm:h-12 font-semibold shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 text-base"
+                  className={
+                    "w-full h-11 sm:h-12 font-semibold shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 text-base"
+                  }
                   disabled={isLoading}
                 >
                   {isLoading
